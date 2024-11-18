@@ -1,0 +1,151 @@
+import random
+
+class Ship:
+    def __init__(self, positions):
+        self.positions = positions  # Список кортежей (строка, колонка)
+        self.hits = 0  # Количество попаданий
+
+    def hit(self, position):
+        if position in self.positions:
+            self.hits += 1
+            return True
+        return False
+
+    def is_sunk(self):
+        return self.hits == len(self.positions)
+
+
+class Board:
+    def __init__(self):
+        self.size = 6
+        self.grid = [['О' for _ in range(self.size)] for _ in range(self.size)]
+        self.ships = []
+        self.shots = set()  # Хранит уже сделанные выстрелы
+
+    def place_ship(self, ship):
+        for pos in ship.positions:
+            self.grid[pos[0]][pos[1]] = '■'
+        self.ships.append(ship)
+
+    def display(self):
+        print("   | 1 | 2 | 3 | 4 | 5 | 6 |")
+        for i, row in enumerate(self.grid):
+            print(f"{i + 1} | " + " | ".join(row) + " |")
+        print()
+
+    def shoot(self, position):
+        if position in self.shots:
+            raise ValueError("Вы уже стреляли в эту клетку!")
+        self.shots.add(position)
+
+        for ship in self.ships:
+            if ship.hit(position):
+                self.grid[position[0]][position[1]] = 'X'  # Попадание
+                return True
+        
+        self.grid[position[0]][position[1]] = 'T'  # Промах
+        return False
+
+    def all_sunk(self):
+        return all(ship.is_sunk() for ship in self.ships)
+
+
+class Game:
+    def __init__(self):
+        self.player_board = Board()
+        self.computer_board = Board()
+        self.setup_ships(self.player_board)
+        self.setup_ships(self.computer_board)
+
+    def setup_ships(self, board):
+        # Корабли: 1 на 3 клетки, 2 на 2 клетки, 4 на 1 клетку
+        ships_info = [
+            ([0, 1, 2], 3),  # Один 3-клеточный корабль
+            ([0, 1], 2), ([0, 2], 2),  # Два 2-клеточных корабля
+            ([0], 1), ([1], 1), ([2], 1), ([3], 1)  # Четыре 1-клеточных корабля
+        ]
+
+        for positions, size in ships_info:
+            while True:
+                orientation = random.choice(['horizontal', 'vertical'])
+                if orientation == 'horizontal':
+                    row = random.randint(0, board.size - 1)
+                    col = random.randint(0, board.size - size)
+                    positions = [(row, col + i) for i in range(size)]
+                else:
+                    row = random.randint(0, board.size - size)
+                    col = random.randint(0, board.size - 1)
+                    positions = [(row + i, col) for i in range(size)]
+
+                if self.can_place_ship(board, positions):
+                    board.place_ship(Ship(positions))
+                    break
+
+    def can_place_ship(self, board, positions):
+        for pos in positions:
+            if board.grid[pos[0]][pos[1]] != 'О':
+                return False
+            # Проверка соседних клеток
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if 0 <= pos[0] + dx < board.size and 0 <= pos[1] + dy < board.size:
+                        if board.grid[pos[0] + dx][pos[1] + dy] == '■':
+                            return False
+        return True
+
+    def player_turn(self):
+        while True:
+            try:
+                row = int(input("Введите номер строки (1-6): ")) - 1
+                col = int(input("Введите номер столбца (1-6): ")) - 1
+                if row < 0 or row >= 6 or col < 0 or col >= 6:
+                    raise ValueError("Неверные координаты! Попробуйте снова.")
+                return (row, col)
+            except ValueError as e:
+                print(e)
+
+    def computer_turn(self):
+        while True:
+            row = random.randint(0, 5)
+            col = random.randint(0, 5)
+            if (row, col) not in self.computer_board.shots:
+                return (row, col)
+
+    def play(self):
+        while True:
+            # Ход игрока
+            self.player_board.display()
+            print("Ваши корабли:")
+            self.computer_board.display()
+            player_shot = self.player_turn()
+            try:
+                hit = self.computer_board.shoot(player_shot)
+                if hit:
+                    print("Попадание!")
+                else:
+                    print("Промах!")
+            except ValueError as e:
+                print(e)
+                continue
+
+            if self.computer_board.all_sunk():
+                print("Вы победили!")
+                break
+
+            # Ход компьютера
+            computer_shot = self.computer_turn()
+            print(f"Компьютер стреляет в {computer_shot[0] + 1}, {computer_shot[1] + 1}")
+            hit = self.player_board.shoot(computer_shot)
+            if hit:
+                print("Компьютер попал!")
+            else:
+                print("Компьютер промахнулся!")
+
+            if self.player_board.all_sunk():
+                print("Компьютер победил!")
+                break
+
+
+if __name__ == "__main__":
+    game = Game()
+    game.play()
